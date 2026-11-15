@@ -1,0 +1,58 @@
+# Pages CMS — where your clients edit this site's content (app.pagescms.org).
+# Written by Clockheart from src/content.config.ts and the schemas Astro generates.
+# Edit freely: it is yours. Options: https://pagescms.org/docs/configuration/
+media:
+  - name: assets
+    input: src/assets
+    output: ../../assets
+    categories:
+      - image
+content:
+  - name: blog
+    label: Blog
+    type: collection
+    path: src/content/blog
+    format: yaml-frontmatter
+    subfolders: true
+    filename: '{primary}.md'
+    view:
+      primary: title
+      fields:
+        - title
+        - pubDate
+        - updatedDate
+        - heroImage
+    fields:
+      - name: title
+        label: Title
+        required: true
+        type: string
+      - name: description
+        label: Description
+        required: true
+        type: text
+      - name: pubDate
+        label: Pub Date
+        required: true
+        type: string
+      - name: updatedDate
+        label: Updated Date
+        type: date
+        options:
+          format: yyyy-MM-dd
+      - name: heroImage
+        label: Hero Image
+        type: image
+        options:
+          media: assets
+          path: src/assets
+      - name: body
+        label: Content
+        type: rich-text
+        options:
+          format: markdown
+settings:
+  content:
+    merge: true
+  commit:
+    identity: user
