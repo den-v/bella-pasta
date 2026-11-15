@@ -1,3 +1,4 @@
+# clockheart-workflow: 3
 # Written by Clockheart. On every change to main (a Publish, or a client's
 # save in Pages CMS) or to preview (a Publish to preview), GitHub builds
 # the site and puts it where the repo variable CLOCKHEART_HOST says:
@@ -17,6 +18,9 @@ permissions:
   id-token: write
 jobs:
   build:
+    # Nothing to build for until the user has chosen where the site lives:
+    # a new site never starts with a failed build.
+    if: ${{ vars.CLOCKHEART_HOST != '' }}
     runs-on: ubuntu-latest
     env:
       HOST: ${{ vars.CLOCKHEART_HOST }}
@@ -54,11 +58,14 @@ jobs:
           set -e
           # One build of one branch into a folder, under a base path (the site's
           # sub-folder: GitHub Pages' /<repo>, or /preview).
+          # Each branch is built in its own folder OUTSIDE the checkout: inside
+          # it, the build would pick up the outer project's tsconfig.
           build_ref() {
-            rm -rf _src && git worktree add -f _src "origin/$1" >/dev/null
-            (cd _src && npm ci && npx astro build $2 --base "${3:-/}" && node .github/clockheart-base.mjs dist "$3")
-            mkdir -p "$4" && cp -R _src/dist/. "$4"/ && touch "$4/.clockheart-site"
-            git worktree remove -f _src
+            SRC="$(mktemp -d)/src"
+            git worktree add -f "$SRC" "origin/$1" >/dev/null
+            (cd "$SRC" && npm ci && npx astro build $2 --base "${3:-/}" && node .github/clockheart-base.mjs dist "$3")
+            mkdir -p "$4" && cp -R "$SRC/dist/." "$4"/ && touch "$4/.clockheart-site"
+            git worktree remove -f "$SRC"
           }
           if [ "$HOST" = "github-pages" ]; then
             # GitHub Pages holds one site per repo: the live site at its root,
