@@ -1,4 +1,4 @@
-# clockheart-workflow: 3
+# clockheart-workflow: 4
 # Written by Clockheart. On every change to main (a Publish, or a client's
 # save in Pages CMS) or to preview (a Publish to preview), GitHub builds
 # the site and puts it where the repo variable CLOCKHEART_HOST says:
@@ -16,6 +16,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 jobs:
   build:
     # Nothing to build for until the user has chosen where the site lives:
@@ -48,12 +49,13 @@ jobs:
           node-version: 24
           cache: npm
       - id: pages
-        if: ${{ vars.CLOCKHEART_HOST == 'github-pages' }}
+        if: ${{ vars.CLOCKHEART_HOST == 'github-pages' && github.ref_name == 'main' }}
         uses: actions/configure-pages@v5
       - name: Build
         env:
           PAGES_ORIGIN: ${{ steps.pages.outputs.origin }}
           PAGES_BASE: ${{ steps.pages.outputs.base_path }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           # One build of one branch into a folder, under a base path (the site's
@@ -67,7 +69,12 @@ jobs:
             mkdir -p "$4" && cp -R "$SRC/dist/." "$4"/ && touch "$4/.clockheart-site"
             git worktree remove -f "$SRC"
           }
-          if [ "$HOST" = "github-pages" ]; then
+          if [ "$HOST" = "github-pages" ] && [ -n "$PREVIEW" ]; then
+            # GitHub Pages deploys only from main: a preview push asks
+            # main to rebuild — and that build includes the preview.
+            gh workflow run clockheart-deploy.yml --ref main
+            echo "Asked main to rebuild with the preview." && exit 0
+          elif [ "$HOST" = "github-pages" ]; then
             # GitHub Pages holds one site per repo: the live site at its root,
             # the preview (when there is one) under /preview/.
             build_ref main "--site $PAGES_ORIGIN" "$PAGES_BASE" site
@@ -80,7 +87,7 @@ jobs:
             if [ -n "$PREVIEW" ] && [ "$HOST" = "sftp" ]; then BASE="$BASE/preview"; fi
             build_ref "$GITHUB_REF_NAME" "${SITE_URL:+--site $SITE_URL}" "$BASE" site
           fi
-      - if: ${{ vars.CLOCKHEART_HOST == 'github-pages' }}
+      - if: ${{ vars.CLOCKHEART_HOST == 'github-pages' && github.ref_name == 'main' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -109,7 +116,7 @@ jobs:
             npx --yes vercel@39 alias set "$URL" "$VERCEL_PREVIEW_ALIAS" --token "$VERCEL_TOKEN"
           else npx --yes vercel@39 deploy site --prod --yes --token "$VERCEL_TOKEN"; fi
   pages:
-    if: ${{ vars.CLOCKHEART_HOST == 'github-pages' }}
+    if: ${{ vars.CLOCKHEART_HOST == 'github-pages' && github.ref_name == 'main' }}
     needs: build
     runs-on: ubuntu-latest
     environment:
